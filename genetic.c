@@ -32,39 +32,102 @@
 
 //2A2B3 should decode to 2+2-3
 #define VALIDGENES 14
-#define TARGET 869
-#define NUMGENE 10
+#define TARGET 420
+#define NUMGENE 20
 #define NUMCHROM 100
 #define NUMPARENT 100
 #define CROSSOVER 0.7
 #define MUTATION 0.01*NUMGENE
+//Mutation rate per gene.
 #define GENMAX 100000
-//we evaluate whether to mutate once per chromosome, rather than once per gene, but want the same effect as checking every gene
-//this saves precious CPU time
+
 
 typedef struct Chrom
 {
     unsigned short gene[NUMGENE];
-    unsigned int decoded;
-    float fitness;
+    int decoded;
+    double fitness;
 } Chrom;
 
 void decodeChrom (Chrom *Chrom, char print);
-float getFitness (int);
+double getFitness (int);
 void genRandomChrom(Chrom *cptr);
-void chooseParents(Chrom carry[], Chrom parent[], float totalfitness);
+void chooseParents(Chrom *carry[], Chrom parent[], double totalfitness);
 void breedParents(Chrom carry[], Chrom parent[]);
+
+/*int compareChrom (const Chrom **a, const Chrom **b)
+{
+    const Chrom *cA = (const Chrom **) a;
+    const Chrom *cB = (const Chrom **) b;
+
+    if ((*cA).fitness > (*cB).fitness)
+        return 1;
+    else if ((*cA).fitness < (*cB).fitness)
+        return -1;
+    else
+        return 0;
+}
+*/
+
+int sortChromArrPartition (Chrom *arr[], int lo, int hi)
+{
+//The array is obviously arr, lo should be 0? and hi should be the rightmost element.
+    //We also need a temp variable for swapping, I think
+    Chrom *temp = 0;
+    //Let's pick a pivot!
+    int pivotIndex = hi/2; //HALF THE LENGTH, WHY NOT
+    double pivotValue = (arr[pivotIndex])->fitness; //so we get the value of the pivot
+    //Now we move the pivot to the end
+    temp = arr[hi];
+    arr[hi] = arr[pivotIndex];
+    arr[pivotIndex] = temp;
+    //OK, swapped!
+    int storeIndex = lo;
+    //I don't know what this is usd for, let's find out together
+    //Now we "compare remaining array elements against pivotValue = A[hi]"
+    for (int i = lo; i < hi; i++)
+    {
+        if((arr[i])->fitness > pivotValue)
+        {
+            temp = arr[storeIndex];
+            arr[storeIndex] = arr[i];
+            arr[i] = temp;
+            storeIndex++;
+        }
+    }
+    //oh god I hope that works
+    //now we "move pivot to its final place"
+    //Swap arr[storeIndex] and arr[hi];
+    temp = arr[storeIndex];
+    arr[storeIndex] = arr[hi];
+    arr[hi] = temp;
+    return storeIndex;
+}
+
+void sortChromArr (Chrom *arr[], int lo, int hi)
+{
+    //Let's implement a quicksort! What could possibly go wrong?
+    if (lo < hi)
+    {
+        int p = sortChromArrPartition(arr, lo, hi);
+        sortChromArr (arr, lo, p - 1);
+        sortChromArr (arr, p + 1, hi);
+    }
+}
+
+
 
 int main (void)
 {
     srand(42); //set the seed
 
     Chrom Chromarray[NUMCHROM] = {0};  //the array that holds this generation's chromosomes
+    Chrom *Chromptr[NUMCHROM]; //this will hold the pointers to the previous array, sorted by fitness
     Chrom testchrom = {0};
     Chrom *cptr = &testchrom;
     Chrom parent[NUMPARENT] = {0}; //these are the weighted chromosomes chosen to breed the next generation
-    float avgfitness = 0;
-    float totalfitness = 0;
+    double avgfitness = 0;
+    double totalfitness = 0;
     Chrom *bestfitness = &testchrom;
     int generation = 0;
     
@@ -83,6 +146,7 @@ int main (void)
     cptr = &Chromarray[0];
     for(int i = 0; i < NUMCHROM; i++)
     {
+        Chromptr[i] = &Chromarray[i];
         genRandomChrom(cptr);
         totalfitness += cptr->fitness;
         if(bestfitness->fitness < cptr->fitness)
@@ -98,27 +162,26 @@ int main (void)
         for(int i = 0; i < NUMCHROM; i++)
         {
             decodeChrom(cptr, 0);
+            Chromptr[i] = &(Chromarray[i]);
             totalfitness += cptr->fitness;
             if(bestfitness->fitness < cptr->fitness)
                 bestfitness = cptr;
             cptr++;
         }
+        sortChromArr(Chromptr, 0, NUMCHROM-1); //qsort takes the rightmost element, not length        
         if(bestfitness->fitness == 1.0)
             break;
         avgfitness = totalfitness/NUMCHROM;
         printf("\t\tGEN %d\nAverage Fitness is: \t%f\nTotal Fitness is: \t%f\nBest Fitness is: \t%f\n\n", generation, avgfitness, totalfitness, bestfitness->fitness);
-        chooseParents(Chromarray, parent, totalfitness);
+        chooseParents(Chromptr, parent, totalfitness);
         breedParents(Chromarray, parent);
         generation++;
         avgfitness = 0;
         totalfitness = 0;
     }
     decodeChrom(bestfitness, 1);
-    printf("\nDone!\nBest fitness was %f, value of %d, with the genes:\n", bestfitness->fitness, bestfitness->decoded);
-    for(int i = 0; i < NUMGENE; i++)
-    {
-        printf("%x\t",bestfitness->gene[i]);
-    }
+    printf("\nDone!\nBest fitness was %f, value of %d\n", bestfitness->fitness, bestfitness->decoded);
+
     return 0;
 }
 
@@ -159,21 +222,20 @@ void breedParents(struct Chrom carry[], struct Chrom parent[])
     }
 }
 
-void chooseParents(struct Chrom carry[], struct Chrom parent[], float totalfitness)
+void chooseParents(Chrom *carry[], Chrom parent[], double totalfitness)
 {
-//TODO: Sort the arrays first before calling this function.
     unsigned int i = 0, j = 0;
     unsigned int numparents = 0;
-    float bestfitness = 0;
+    double bestfitness = 0;
     while(i < NUMPARENT)
     {
-        if(carry[j].fitness > bestfitness)
-            bestfitness=carry[j].fitness;
-        numparents = (int)((carry[j].fitness/totalfitness)*NUMPARENT); //we weight the new parents based on what percent the chromosome contributed to the total fitness
+        if((carry[j]->fitness) > bestfitness)
+            bestfitness=carry[j]->fitness;
+        numparents = (int)(((carry[j]->fitness)/totalfitness)*NUMPARENT); //we weight the new parents based on what percent the chromosome contributed to the total fitness
         //printf("\nNumparents for %d is %d\n", i, numparents);
         while(numparents > 0)
         {
-            parent[i] = carry[j];
+            parent[i] = *(carry[j]);
             //printf("%d ", j); //uncomment this to see which chromosomes we choose
             numparents--;
             i++;
@@ -200,6 +262,7 @@ void decodeChrom (Chrom *Chrom, char print)
 {
     int a = UINT_MAX, b = UINT_MAX;
     int decoded = 0;
+    Chrom->decoded = 0;
     int op = 0;
     for(int i = 0; i < NUMGENE; i++)
     {
@@ -249,11 +312,27 @@ void decodeChrom (Chrom *Chrom, char print)
     Chrom->decoded = decoded;
  }
 
-float getFitness (int decoded)
+double getFitness (int decoded)
 {
+    
     if (decoded - TARGET == 0)
         return 1;
-    float fitness = (decoded > TARGET) ? (1/(float)(decoded - TARGET)) : (1/(float)(TARGET - decoded));
-    //printf("\nFitness is %f\n\n", fitness);
+    //   double fitness; = (decoded > TARGET) ? (1/(double)(decoded - TARGET)) : (1/(double)(TARGET - decoded));
+    
+    double fitness = 0;
+/*
+  int difference = (decoded - TARGET);
+  double temp = 2;
+    if(difference < 0)
+        difference = -difference;
+
+    for (int i = 0; i < difference; i++)
+    {
+        temp = temp * temp;
+    }
+*/
+    fitness = (double)1/(decoded - TARGET);
+    if (fitness < 0)
+        fitness = -fitness;
     return fitness;
 }
