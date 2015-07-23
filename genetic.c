@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <time.h>
 /*
   Gene encoding:
   0:         0000  
@@ -32,15 +33,15 @@
 
 //2A2B3 should decode to 2+2-3
 #define VALIDGENES 14
-#define TARGET 694
-#define NUMGENE 10
-#define NUMCHROM 100
+#define NUMGENE 17
+#define NUMCHROM 50
 #define NUMPARENT 100
-#define CROSSOVER 0.2
-#define MUTATION 0.001*NUMGENE
+#define CROSSOVER 0.7
+#define MUTATION 0.01*NUMGENE
 //Mutation rate per gene.
-#define GENMAX 100000
+#define GENMAX 250000
 
+int TARGET = 0;
 
 typedef struct Chrom
 {
@@ -54,20 +55,6 @@ double getFitness (int);
 void genRandomChrom(Chrom *cptr);
 void chooseParents(Chrom *carry[], Chrom parent[], double totalfitness);
 void breedParents(Chrom carry[], Chrom parent[]);
-
-/*int compareChrom (const Chrom **a, const Chrom **b)
-{
-    const Chrom *cA = (const Chrom **) a;
-    const Chrom *cB = (const Chrom **) b;
-
-    if ((*cA).fitness > (*cB).fitness)
-        return 1;
-    else if ((*cA).fitness < (*cB).fitness)
-        return -1;
-    else
-        return 0;
-}
-*/
 
 int sortChromArrPartition (Chrom *arr[], int lo, int hi)
 {
@@ -115,10 +102,17 @@ void sortChromArr (Chrom *arr[], int lo, int hi)
     }
 }
 
-int main (void)
+int main (int argc, char *argv[])
 {
-    srand(42); //set the seed
+    srand(time(NULL)); //set the seed
 
+    if(argc != 2)
+        TARGET = 8675309; //placeholder
+    else
+    {
+        char* endptr = 0;    
+        TARGET = strtol(argv[1], &endptr, 10);
+    }
     Chrom Chromarray[NUMCHROM] = {0};  //the array that holds this generation's chromosomes
     Chrom *Chromptr[NUMCHROM]; //this will hold the pointers to the previous array, sorted by fitness
     //Chrom testchrom = {0};
