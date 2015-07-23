@@ -33,13 +33,13 @@
 
 //2A2B3 should decode to 2+2-3
 #define VALIDGENES 14
-#define NUMGENE 17
-#define NUMCHROM 50
+#define NUMGENE 13
+#define NUMCHROM 100
 #define NUMPARENT 100
 #define CROSSOVER 0.7
-#define MUTATION 0.01*NUMGENE
-//Mutation rate per gene.
-#define GENMAX 250000
+#define MUTATION 0.1
+//Chance of a chromosome having *any* mutation.
+#define GENMAX 2500000
 
 int TARGET = 0;
 
@@ -105,6 +105,9 @@ void sortChromArr (Chrom *arr[], int lo, int hi)
 int main (int argc, char *argv[])
 {
     srand(time(NULL)); //set the seed
+    time_t epoch1;
+    epoch1 = time(NULL);
+    printf("\nProgram started at %ld", (long)epoch1);
 
     if(argc != 2)
         TARGET = 8675309; //placeholder
@@ -172,32 +175,37 @@ int main (int argc, char *argv[])
     decodeChrom(bestfitness, 1);
     printf("\nDone!\nBest fitness was %f, with a value of %d after %d generations\n", bestfitness->fitness, bestfitness->decoded, generation);
 
+    time_t epoch2;
+    epoch2 = time(NULL);
+    printf("\nProgram ended at %ld for an execution time of %ld seconds", (long)epoch2, (long)epoch2 - (long)epoch1);
     return 0;
 }
 
 void breedParents(struct Chrom carry[], struct Chrom parent[])
 {
-    unsigned int i = 0;
+    unsigned int i = 1;
     Chrom *a = &parent[0];
     Chrom *b = &parent[1];
-    int random = 0;
+    int crossover = 0;
     while (i < NUMCHROM)
     {
         //Choose two random parents
         a = &parent[rand()%NUMPARENT];
         b = &parent[rand()%NUMPARENT];
 
-        carry[i] = *a; //bring a into the next generation
+        carry[i-1] = *a; //bring a into the next generation
+        carry[i] = *b; //bring b over too
 
-        //Decide whether to crossover a
+        //Decide whether to crossover
         if(rand() < (RAND_MAX*CROSSOVER))
         {
             //If we crossover, choose a random gene after which to swap with b
-            random = rand()%NUMGENE;
-            while(random < NUMGENE)
+            crossover = rand()%NUMGENE;
+            while(crossover < NUMGENE)
             {
-                carry[i].gene[random] = b->gene[random];
-                random++;
+                carry[i-1].gene[crossover] = b->gene[crossover];
+                carry[i].gene[crossover] = a->gene[crossover];
+                crossover++;
                 //printf("\n\tSwapped genes with fitnesses %f and %f after gene %d\n", a->fitness, b->fitness, random);
             }
         }
@@ -307,8 +315,6 @@ double getFitness (int decoded)
     
     if (decoded - TARGET == 0)
         return 100;
-    //   double fitness; = (decoded > TARGET) ? (1/(double)(decoded - TARGET)) : (1/(double)(TARGET - decoded));
-    
     double fitness = 0;
 /*
   int difference = (decoded - TARGET);
@@ -324,5 +330,5 @@ double getFitness (int decoded)
     fitness = (double)1/(decoded - TARGET);
     if (fitness < 0)
         fitness = -fitness;
-    return fitness;
+    return fitness*10;
 }
